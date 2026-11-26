@@ -423,7 +423,7 @@
         <div class="ocr-option">
           <label>
             <input type="checkbox" id="enableOcr" checked>
-            Activer l'OCR automatique sur les pages scannées (retournement auto à 180° inclus)
+            Activer l'OCR automatique sur les pages scannées (rotation auto 0° / 180° / 90° / 270°)
           </label>
         </div>
 
@@ -822,7 +822,7 @@
     showView("public");
   }
 
-  // === OCR AVEC RETOURNEMENT AUTO 180° PAR SCORE DE CONFIANCE ===
+  // === OCR AVEC DETECTION PAGE BLANCHE + ROTATION 0 / 180 / 90 / 270 ===
   async function getOcrWorker() {
     if (!ocrWorker) {
       const progressText = document.getElementById("progressText");
@@ -845,32 +845,48 @@
     return canvas;
   }
 
+  function isMostlyBlank(canvas) {
+    const ctx = canvas.getContext("2d");
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let darkPixels = 0;
+    for (let i = 0; i < data.length; i += 64) {
+      if (data[i] < 200 || data[i + 1] < 200 || data[i + 2] < 200) darkPixels++;
+    }
+    return (darkPixels / (data.length / 64)) < 0.002;
+  }
+
   async function ocrPdfPage(page, pageNum, totalPages, fileName) {
     const worker = await getOcrWorker();
     const progressText = document.getElementById("progressText");
+    const angles = [0, 180, 90, 270];
 
-    // 1er essai : orientation d'origine
-    if (progressText) progressText.textContent = `OCR page ${pageNum}/${totalPages} : ${fileName}`;
-    let canvas = await renderPageToCanvas(page, 0);
-    let res = await worker.recognize(canvas);
-    canvas.width = 0; canvas.height = 0;
+    let bestText = "";
+    let bestConf = -1;
 
-    let bestText = res.data.text || "";
-    let bestConf = res.data.confidence || 0;
+    for (const angle of angles) {
+      const label = angle === 0 ? "" : ` (${angle}°)`;
+      if (progressText) progressText.textContent = `OCR page ${pageNum}/${totalPages}${label} : ${fileName}`;
 
-    // Si confiance faible (< 60%), on tente en retournant la page à 180°
-    if (bestConf < 60) {
-      if (progressText) progressText.textContent = `OCR page ${pageNum}/${totalPages} (test 180°) : ${fileName}`;
-      canvas = await renderPageToCanvas(page, 180);
-      const res180 = await worker.recognize(canvas);
+      const canvas = await renderPageToCanvas(page, angle);
+      if (angle === 0 && isMostlyBlank(canvas)) {
+        canvas.width = 0; canvas.height = 0;
+        return "";
+      }
+
+      const res = await worker.recognize(canvas);
       canvas.width = 0; canvas.height = 0;
 
-      if ((res180.data.confidence || 0) > bestConf) {
-        bestText = res180.data.text || "";
+      const conf = res.data.confidence || 0;
+      const text = (res.data.text || "").replace(/\s+/g, " ").trim();
+
+      if (conf > bestConf) {
+        bestConf = conf;
+        bestText = text;
       }
+      if (conf >= 65 && text.length > 30) break;
     }
 
-    return bestText.replace(/\s+/g, " ").trim();
+    return bestText;
   }
 
   async function indexAndUploadFile(file, axe, metier, customTitle = null, customDate = null) {
