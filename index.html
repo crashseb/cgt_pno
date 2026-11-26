@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>CGT Paris-Nord — Archives RCC</title>
+  <link rel="icon" type="image/svg+xml" href="https://moralscore.org/media/icons/large/CGT_-_ethique_-_moralscore_-_comparateur.svg">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #f6f6f7;
+      --card: #ffffff;
+      --text: #18181b;
+      --muted: #52525b;
+      --border: #e4e4e7;
+      --primary: #d6001c;
+      --primary-hover: #ad0017;
+      --primary-soft: #fef2f2;
+      --primary-border: #fecaca;
+      --dark: #18181b;
+      --mark: #fde047;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    nav {
+      background: var(--primary);
+      color: #fff;
+      padding: 10px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 3px solid var(--dark);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+    .cgt-logo {
+      background: #fff;
+      color: var(--primary);
+      font-weight: 900;
+      font-size: 0.95rem;
+      padding: 4px 7px;
+      border-radius: 6px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    }
+    .cgt-logo img { height: 30px; width: auto; max-width: 75px; object-fit: contain; display: block; }
+    .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .brand-title { font-weight: 800; font-size: 1rem; letter-spacing: 0.01em; }
+    .brand-sub { font-size: 0.72rem; opacity: 0.9; font-weight: 500; }
+
+    .nav-actions { display: flex; gap: 8px; align-items: center; }
+    main { max-width: 960px; margin: 24px auto; padding: 0 16px 40px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: 0.15s;
+    }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-dark { background: var(--dark); color: #fff; }
+    .btn-dark:hover { background: #27272a; }
+    .btn-secondary { background: #f4f4f5; color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover { background: #e4e4e7; }
+    .btn-danger { background: var(--primary-soft); color: var(--primary); border-color: var(--primary-border); }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-nav { background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.28); }
+    .btn-nav:hover { background: rgba(255,255,255,0.28); }
+    .btn-sm { padding: 6px 11px; font-size: 0.8rem; }
+    .btn-xs { padding: 3px 8px; font-size: 0.75rem; }
+
+    input[type="text"], input[type="email"], input[type="password"], input[type="date"], select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      background: #fff;
+      color: var(--text);
+    }
+    input:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+    .dropzone {
+      border: 2px dashed #d4d4d8;
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+      background: #fafafa;
+      cursor: pointer;
+      transition: 0.15s;
+      margin-bottom: 12px;
+    }
+    .dropzone.dragover { border-color: var(--primary); background: var(--primary-soft); }
+    .dropzone-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .dropzone-sub { font-size: 0.8rem; color: var(--muted); }
+    .selected-info { margin-top: 10px; font-size: 0.82rem; font-weight: 700; color: var(--primary); }
+
+    .progress-wrap {
+      margin-top: 14px;
+      background: #f4f4f5;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .progress-label { display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
+    .progress-bar-bg { height: 10px; background: #e4e4e7; border-radius: 99px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.2s; }
+
+    .search-row { display: flex; gap: 10px; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .date-filter-field { display: flex; align-items: center; gap: 8px; }
+    .date-filter-field label { font-size: 0.8rem; font-weight: 700; color: var(--muted); min-width: 24px; }
+    .date-filter-field input[type="date"] { padding: 8px 10px; font-size: 0.86rem; }
+    .search-options {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .search-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 20px 0 12px;
+      border-left: 4px solid var(--primary);
+      padding-left: 10px;
+    }
+
+    .doc-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .doc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px; }
+    .badge {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border: 1px solid var(--primary-border);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .badge-axe {
+      background: #f4f4f5;
+      color: #18181b;
+      border: 1px solid #d4d4d8;
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .badge-metier {
+      background: #18181b;
+      color: #fff;
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .pages-count { font-size: 0.76rem; color: var(--muted); }
+    .doc-title { font-weight: 600; font-size: 0.98rem; }
+    .doc-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .snippet-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .snippet-box {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--primary);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.88rem;
+    }
+    .snippet-page {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .snippet-page:hover { text-decoration: underline; }
+    mark { background: var(--mark); color: #18181b; padding: 0 3px; border-radius: 3px; font-weight: 700; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+    .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; color: var(--text); }
+
+    .tax-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+    .tax-box { background: #fafafa; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+    .tax-box h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; color: var(--muted); }
+    .tax-add { display: flex; gap: 6px; margin-bottom: 10px; }
+    .tax-add input { padding: 7px 10px; font-size: 0.84rem; }
+    .tax-list { display: flex; flex-direction: column; gap: 6px; }
+    .tax-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .tax-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+    .modal { background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .modal h3 { font-size: 1.05rem; margin-bottom: 14px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+    .alert { padding: 12px 14px; border-radius: 8px; font-size: 0.88rem; font-weight: 500; margin-bottom: 16px; }
+    .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .hidden { display: none !important; }
+    .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: 0.92rem; }
+    footer { text-align: center; font-size: 0.78rem; color: var(--muted); padding: 10px 16px 28px; }
+
+    @media (max-width: 650px) {
+      .search-row, .form-grid, .filter-row, .tax-grid { flex-direction: column; grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand" onclick="showView('public')">
+      <span class="cgt-logo">
+        <img
+          src="https://moralscore.org/media/icons/large/CGT_-_ethique_-_moralscore_-_comparateur.svg"
+          alt="Logo CGT"
+          onerror="this.replaceWith(document.createTextNode('CGT'))"
+        >
+      </span>
+      <div class="brand-text">
+        <span class="brand-title">CGT Paris-Nord</span>
+        <span class="brand-sub">Archives &amp; Recherche RCC</span>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <button id="btnNavPublic" class="btn btn-nav btn-sm hidden" onclick="showView('public')">Retour aux RCC</button>
+      <button id="btnNavAdmin" class="btn btn-dark btn-sm" onclick="openAdmin()">Admin</button>
+      <button id="btnLogout" class="btn btn-nav btn-sm hidden" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <div id="alertBox" class="alert hidden"></div>
+
+  <!-- VUE PUBLIQUE -->
+  <section id="viewPublic">
+    <div class="card">
+      <form id="searchForm" onsubmit="runSearch(event)">
+        <div class="search-row">
+          <input type="text" id="searchInput" placeholder="Rechercher un mot ou groupe de mots (ex: pause pour repas, UNIGO, SUGE...)">
+          <button type="submit" class="btn btn-primary">Rechercher</button>
+        </div>
+
+        <div class="filter-row">
+          <select id="filterAxe" onchange="runSearch()"></select>
+          <select id="filterMetier" onchange="runSearch()"></select>
+        </div>
+
+        <div class="filter-row">
+          <div class="date-filter-field">
+            <label for="filterDateFrom">Du</label>
+            <input type="date" id="filterDateFrom" onchange="runSearch()">
+          </div>
+          <div class="date-filter-field">
+            <label for="filterDateTo">Au</label>
+            <input type="date" id="filterDateTo" onchange="runSearch()">
+          </div>
+        </div>
+
+        <div class="search-options">
+          <label>
+            <input type="checkbox" id="exactCheck" onchange="runSearch()"> Expression exacte
+          </label>
+          <a href="#" id="resetSearchLink" class="hidden" onclick="resetSearch(event)" style="color:var(--primary);text-decoration:none;font-weight:700;">Réinitialiser les filtres</a>
+        </div>
+      </form>
+    </div>
+
+    <div id="publicTitle" class="section-title">Chargement des RCC...</div>
+    <div id="publicList"></div>
+  </section>
+
+  <!-- VUE CONNEXION ADMIN -->
+  <section id="viewLogin" class="hidden">
+    <div class="card" style="max-width:380px;margin:40px auto;">
+      <h2 style="font-size:1.1rem;margin-bottom:14px;">Administration CGT Paris-Nord</h2>
+      <form onsubmit="handleLogin(event)">
+        <div class="field" style="margin-bottom:12px;">
+          <label for="adminEmail">Email</label>
+          <input type="email" id="adminEmail" required>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label for="adminPwd">Mot de passe</label>
+          <input type="password" id="adminPwd" required>
+        </div>
+        <button type="submit" id="btnLogin" class="btn btn-primary" style="width:100%;">Se connecter</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- VUE ADMIN -->
+  <section id="viewAdmin" class="hidden">
+    <div class="card">
+      <h2 style="font-size:1.05rem;margin-bottom:12px;">Ajouter un ou plusieurs RCC (PDF)</h2>
+      <form id="uploadForm" onsubmit="handleUpload(event)">
+        <div class="form-grid" style="margin-top:0;">
+          <div class="field">
+            <label for="uploadAxe">Axe du lot *</label>
+            <select id="uploadAxe" required></select>
+          </div>
+          <div class="field">
+            <label for="uploadMetier">Métier du lot *</label>
+            <select id="uploadMetier" required></select>
+          </div>
+        </div>
+
+        <div id="dropzone" class="dropzone" onclick="document.getElementById('pdfFile').click()">
+          <div class="dropzone-title">Cliquez ici ou glissez-déposez vos fichiers PDF</div>
+          <div class="dropzone-sub">1 Axe + 1 Métier s'appliquent à tout le lot sélectionné</div>
+          <div id="selectedInfo" class="selected-info hidden"></div>
+        </div>
+        <input type="file" id="pdfFile" accept="application/pdf" multiple class="hidden" onchange="onFilesSelected()">
+
+        <div id="singleMetaFields" class="form-grid">
+          <div class="field">
+            <label for="docTitle">Titre (auto si vide)</label>
+            <input type="text" id="docTitle" placeholder="Ex: RCC DCI CGT 09/11/2026">
+          </div>
+          <div class="field">
+            <label for="docDate">Date du RCC (détectée auto si possible)</label>
+            <input type="date" id="docDate">
+          </div>
+        </div>
+
+        <button type="submit" id="btnUpload" class="btn btn-primary">Importer et indexer</button>
+
+        <div id="progressWrap" class="progress-wrap hidden">
+          <div class="progress-label">
+            <span id="progressText">Indexation...</span>
+            <span id="progressCount">0 / 0</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="progressFill" class="progress-bar-fill"></div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1.05rem;">Gérer les Axes et les Métiers</h2>
+      <div class="tax-grid">
+        <div class="tax-box">
+          <h3>Axes</h3>
+          <div class="tax-add">
+            <input type="text" id="newAxeInput" placeholder="Nouvel axe...">
+            <button type="button" class="btn btn-primary btn-sm" onclick="addTaxonomy('axes')">Ajouter</button>
+          </div>
+          <div id="axesList" class="tax-list"></div>
+        </div>
+
+        <div class="tax-box">
+          <h3>Métiers</h3>
+          <div class="tax-add">
+            <input type="text" id="newMetierInput" placeholder="Nouveau métier...">
+            <button type="button" class="btn btn-primary btn-sm" onclick="addTaxonomy('metiers')">Ajouter</button>
+          </div>
+          <div id="metiersList" class="tax-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title" id="adminCount">Documents enregistrés</div>
+    <div id="adminList"></div>
+  </section>
+</main>
+
+<!-- MODALE EDITION -->
+<div id="editModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3>Modifier le RCC</h3>
+    <form onsubmit="saveEditModal(event)">
+      <input type="hidden" id="editDocId">
+      <div class="field" style="margin-bottom:10px;">
+        <label for="editTitle">Titre</label>
+        <input type="text" id="editTitle" required>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label for="editDate">Date</label>
+        <input type="date" id="editDate" required>
+      </div>
+      <div class="form-grid" style="margin:0;">
+        <div class="field">
+          <label for="editAxe">Axe</label>
+          <select id="editAxe"></select>
+        </div>
+        <div class="field">
+          <label for="editMetier">Métier</label>
+          <select id="editMetier"></select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeEditModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer>
+  Syndicat CGT Cheminots de Paris-Nord — Outil interne de consultation des RCC
+</footer>
+
+<script>
+  const BUCKET = "rcc-pdfs";
+  const sb = window.supabase.createClient(
+    window.APP_CONFIG.SUPABASE_URL,
+    window.APP_CONFIG.SUPABASE_ANON_KEY
+  );
+
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+
+  let isAdmin = false;
+  let allDocs = [];
+  let taxonomy = { axes: [], metiers: [] };
+  let selectedFiles = [];
+
+  // === CHARGEMENT DONNEES SUPABASE ===
+  async function loadAllData() {
+    const [setRes, docRes] = await Promise.all([
+      sb.from("settings").select("key, value"),
+      sb.from("documents").select("*").order("doc_date", { ascending: false }).order("id", { ascending: false })
+    ]);
+
+    if (setRes.data) {
+      for (const row of setRes.data) {
+        if (row.key === "axes") taxonomy.axes = row.value || [];
+        if (row.key === "metiers") taxonomy.metiers = row.value || [];
+      }
+    }
+    if (docRes.error) {
+      showAlert("Erreur de connexion à la base : " + docRes.error.message, "error");
+      return;
+    }
+    allDocs = docRes.data || [];
+    refreshAllSelects();
+  }
+
+  // === GESTION AXES / METIERS ===
+  async function saveTaxonomy(type, list) {
+    const { error } = await sb.from("settings").upsert({ key: type, value: list });
+    if (error) {
+      showAlert("Erreur sauvegarde : " + error.message, "error");
+      return;
+    }
+    taxonomy[type] = list;
+    refreshAllSelects();
+    renderTaxonomyAdmin();
+  }
+
+  async function addTaxonomy(type) {
+    const input = document.getElementById(type === "axes" ? "newAxeInput" : "newMetierInput");
+    const val = input.value.trim();
+    if (!val) return;
+    if (taxonomy[type].some(i => i.toLowerCase() === val.toLowerCase())) {
+      showAlert("Cet élément existe déjà.", "error");
+      return;
+    }
+    await saveTaxonomy(type, [...taxonomy[type], val]);
+    input.value = "";
+    showAlert(`« ${val} » ajouté.`);
+  }
+
+  async function renameTaxonomy(type, oldVal) {
+    const newVal = prompt("Nouveau nom :", oldVal);
+    if (!newVal || !newVal.trim() || newVal.trim() === oldVal) return;
+    const cleanNew = newVal.trim();
+    if (taxonomy[type].some(i => i.toLowerCase() === cleanNew.toLowerCase())) {
+      showAlert("Ce nom existe déjà.", "error");
+      return;
+    }
+
+    const updated = taxonomy[type].map(v => v === oldVal ? cleanNew : v);
+    await saveTaxonomy(type, updated);
+
+    const col = type === "axes" ? "axe" : "metier";
+    await sb.from("documents").update({ [col]: cleanNew }).eq(col, oldVal);
+    await loadAllData();
+    renderAdminList();
+    showAlert(`« ${oldVal} » renommé en « ${cleanNew} ».`);
+  }
+
+  async function removeTaxonomy(type, val) {
+    if (!confirm(`Retirer « ${val} » de la liste ?`)) return;
+    await saveTaxonomy(type, taxonomy[type].filter(i => i !== val));
+    showAlert(`« ${val} » retiré.`);
+  }
+
+  function renderTaxonomyAdmin() {
+    const renderList = (type, containerId) => {
+      const list = taxonomy[type];
+      const container = document.getElementById(containerId);
+      if (!list.length) {
+        container.innerHTML = `<div style="font-size:0.8rem;color:var(--muted);">Aucun élément</div>`;
+        return;
+      }
+      container.innerHTML = list.map(val => {
+        const safeJs = escapeHtml(val).replace(/'/g, "\\'");
+        return `
+          <div class="tax-item">
+            <span>${escapeHtml(val)}</span>
+            <div class="tax-item-actions">
+              <button type="button" class="btn btn-secondary btn-xs" onclick="renameTaxonomy('${type}', '${safeJs}')">Renommer</button>
+              <button type="button" class="btn btn-danger btn-xs" onclick="removeTaxonomy('${type}', '${safeJs}')">×</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    };
+    renderList("axes", "axesList");
+    renderList("metiers", "metiersList");
+  }
+
+  function populateSelect(selectId, list, placeholder = null) {
+    const sel = document.getElementById(selectId);
+    const current = sel.value;
+    let html = placeholder ? `<option value="">${escapeHtml(placeholder)}</option>` : "";
+    html += list.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
+    sel.innerHTML = html;
+    if (current && list.includes(current)) sel.value = current;
+  }
+
+  function refreshAllSelects() {
+    populateSelect("filterAxe", taxonomy.axes, "Tous les axes");
+    populateSelect("filterMetier", taxonomy.metiers, "Tous les métiers");
+    populateSelect("uploadAxe", taxonomy.axes);
+    populateSelect("uploadMetier", taxonomy.metiers);
+    populateSelect("editAxe", taxonomy.axes, "— Non défini —");
+    populateSelect("editMetier", taxonomy.metiers, "— Non défini —");
+  }
+
+  // === UTILITAIRES ===
+  function showAlert(msg, type = "success") {
+    const box = document.getElementById("alertBox");
+    box.textContent = msg;
+    box.className = `alert alert-${type}`;
+    box.classList.remove("hidden");
+    setTimeout(() => box.classList.add("hidden"), 6000);
+  }
+
+  function normalizeText(str) {
+    return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  function escapeHtml(str) {
+    return (str || "").replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
+  }
+
+  function formatDateFR(isoDate) {
+    if (!isoDate || !isoDate.includes("-")) return isoDate || "Sans date";
+    const [y, m, d] = isoDate.split("-");
+    return `${d}/${m}/${y}`;
+  }
+
+  function renderBadges(doc) {
+    return `
+      <span class="badge">${formatDateFR(doc.doc_date)}</span>
+      ${doc.axe ? `<span class="badge-axe">${escapeHtml(doc.axe)}</span>` : ""}
+      ${doc.metier ? `<span class="badge-metier">${escapeHtml(doc.metier)}</span>` : ""}
+      <span class="pages-count">${doc.page_count} p.</span>
+    `;
+  }
+
+  // === DETECTEUR UNIVERSEL DE DATE ===
+  function toIsoIfValid(y, m, d) {
+    const year = parseInt(y, 10), month = parseInt(m, 10), day = parseInt(d, 10);
+    if (year < 1990 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const dt = new Date(year, month - 1, day);
+    if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) return null;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  function extractDateFromText(input) {
+    if (!input) return null;
+    const norm = normalizeText(input);
+    const months = {
+      jan:1, janv:1, janvier:1, fev:2, fevr:2, fevrier:2, mar:3, mars:3,
+      avr:4, avril:4, mai:5, juin:6, juil:7, juill:7, juillet:7, aou:8, aout:8,
+      sep:9, sept:9, septembre:9, oct:10, octobre:10, nov:11, novembre:11, dec:12, decembre:12
+    };
+    const mp = Object.keys(months).sort((a, b) => b.length - a.length).join("|");
+    let m = norm.match(new RegExp(`\\b(\\d{1,2})(?:er)?[\\s._-]+(${mp})\\.?[\\s._-]+(20\\d{2}|19\\d{2})\\b`, "i"));
+    if (m) { const iso = toIsoIfValid(m[3], months[m[2]], m[1]); if (iso) return iso; }
+
+    m = norm.match(/\b(20\d{2}|19\d{2})[\s._/-](\d{1,2})[\s._/-](\d{1,2})\b/);
+    if (m) { const iso = toIsoIfValid(m[1], m[2], m[3]); if (iso) return iso; }
+
+    m = norm.match(/\b(\d{1,2})[\s._/-](\d{1,2})[\s._/-](20\d{2}|19\d{2})\b/);
+    if (m) { const iso = toIsoIfValid(m[3], m[2], m[1]); if (iso) return iso; }
+
+    m = norm.match(/(?<!\d)(20\d{2}|19\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)/);
+    if (m) { const iso = toIsoIfValid(m[1], m[2], m[3]); if (iso) return iso; }
+
+    m = norm.match(/(?<!\d)(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])(20\d{2}|19\d{2})(?!\d)/);
+    if (m) { const iso = toIsoIfValid(m[3], m[2], m[1]); if (iso) return iso; }
+
+    m = norm.match(/\b(\d{1,2})[\s._/-](\d{1,2})[\s._/-](\d{2})\b/);
+    if (m) { const iso = toIsoIfValid("20" + m[3], m[2], m[1]); if (iso) return iso; }
+
+    return null;
+  }
+
+  // === DRAG & DROP ===
+  const dropzone = document.getElementById("dropzone");
+  ["dragenter", "dragover"].forEach(evt => dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach(evt => dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove("dragover"); }));
+  dropzone.addEventListener("drop", e => {
+    const files = [...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith(".pdf"));
+    if (!files.length) return showAlert("Seuls les fichiers PDF sont acceptés.", "error");
+    setSelectedFiles(files);
+  });
+
+  function onFilesSelected() {
+    setSelectedFiles([...document.getElementById("pdfFile").files].filter(f => f.name.toLowerCase().endsWith(".pdf")));
+  }
+
+  function setSelectedFiles(files) {
+    selectedFiles = files;
+    const info = document.getElementById("selectedInfo");
+    const singleFields = document.getElementById("singleMetaFields");
+    const btn = document.getElementById("btnUpload");
+
+    if (!files.length) {
+      info.classList.add("hidden");
+      singleFields.classList.remove("hidden");
+      btn.textContent = "Importer et indexer";
+      return;
+    }
+    info.classList.remove("hidden");
+    if (files.length === 1) {
+      info.textContent = `1 fichier sélectionné : ${files[0].name}`;
+      singleFields.classList.remove("hidden");
+      document.getElementById("docTitle").value = files[0].name.replace(/\.pdf$/i, "");
+      document.getElementById("docDate").value = extractDateFromText(files[0].name) || "";
+      btn.textContent = "Importer et indexer ce PDF";
+    } else {
+      info.textContent = `${files.length} fichiers PDF sélectionnés — titres et dates détectés automatiquement`;
+      singleFields.classList.add("hidden");
+      btn.textContent = `Importer et indexer les ${files.length} PDF`;
+    }
+  }
+
+  // === AUTH & NAVIGATION ===
+  function showView(name) {
+    document.getElementById("viewPublic").classList.toggle("hidden", name !== "public");
+    document.getElementById("viewLogin").classList.toggle("hidden", name !== "login");
+    document.getElementById("viewAdmin").classList.toggle("hidden", name !== "admin");
+    document.getElementById("btnNavPublic").classList.toggle("hidden", name === "public");
+    document.getElementById("btnNavAdmin").classList.toggle("hidden", name === "admin");
+    document.getElementById("btnLogout").classList.toggle("hidden", !isAdmin);
+
+    if (name === "public") runSearch();
+    if (name === "admin") { renderTaxonomyAdmin(); renderAdminList(); }
+  }
+
+  function openAdmin() {
+    showView(isAdmin ? "admin" : "login");
+    if (!isAdmin) setTimeout(() => document.getElementById("adminEmail").focus(), 50);
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnLogin");
+    btn.disabled = true;
+    const { error } = await sb.auth.signInWithPassword({
+      email: document.getElementById("adminEmail").value.trim(),
+      password: document.getElementById("adminPwd").value
+    });
+    btn.disabled = false;
+    if (error) return showAlert("Identifiants incorrects.", "error");
+    isAdmin = true;
+    document.getElementById("adminPwd").value = "";
+    showView("admin");
+  }
+
+  async function logout() {
+    await sb.auth.signOut();
+    isAdmin = false;
+    showView("public");
+  }
+
+  // === UPLOAD PAR LOT VERS SUPABASE ===
+  async function indexAndUploadFile(file, axe, metier, customTitle = null, customDate = null) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
+
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items.map(item => item.str).join(" ").replace(/\s+/g, " ").trim();
+      pages.push({ pageNum: i, text });
+    }
+
+    const title = (customTitle && customTitle.trim()) || file.name.replace(/\.pdf$/i, "");
+    const docDate = customDate
+      || extractDateFromText(file.name)
+      || extractDateFromText(pages[0]?.text || "")
+      || new Date().toISOString().slice(0, 10);
+
+    const storagePath = `${crypto.randomUUID()}.pdf`;
+    const up = await sb.storage.from(BUCKET).upload(storagePath, file, { contentType: "application/pdf" });
+    if (up.error) throw up.error;
+
+    const ins = await sb.from("documents").insert({
+      title,
+      doc_date: docDate,
+      axe,
+      metier,
+      original_name: file.name,
+      page_count: pdf.numPages,
+      pages,
+      storage_path: storagePath
+    });
+    if (ins.error) {
+      await sb.storage.from(BUCKET).remove([storagePath]);
+      throw ins.error;
+    }
+  }
+
+  async function handleUpload(e) {
+    e.preventDefault();
+    if (!selectedFiles.length) return showAlert("Sélectionne au moins un fichier PDF.", "error");
+
+    const axe = document.getElementById("uploadAxe").value;
+    const metier = document.getElementById("uploadMetier").value;
+    const btn = document.getElementById("btnUpload");
+    const progressWrap = document.getElementById("progressWrap");
+    const progressText = document.getElementById("progressText");
+    const progressCount = document.getElementById("progressCount");
+    const progressFill = document.getElementById("progressFill");
+
+    btn.disabled = true;
+    progressWrap.classList.remove("hidden");
+
+    const isSingle = selectedFiles.length === 1;
+    const customTitle = isSingle ? document.getElementById("docTitle").value : null;
+    const customDate = isSingle ? document.getElementById("docDate").value : null;
+
+    let okCount = 0, errCount = 0;
+    const total = selectedFiles.length;
+
+    for (let i = 0; i < total; i++) {
+      const file = selectedFiles[i];
+      progressText.textContent = `Envoi : ${file.name}`;
+      progressCount.textContent = `${i + 1} / ${total}`;
+      progressFill.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
+      try {
+        await indexAndUploadFile(file, axe, metier, customTitle, customDate);
+        okCount++;
+      } catch (err) {
+        console.error(err);
+        errCount++;
+      }
+    }
+
+    document.getElementById("pdfFile").value = "";
+    document.getElementById("docTitle").value = "";
+    document.getElementById("docDate").value = "";
+    setSelectedFiles([]);
+    btn.disabled = false;
+    progressWrap.classList.add("hidden");
+    progressFill.style.width = "0%";
+
+    await loadAllData();
+    renderAdminList();
+    showAlert(
+      errCount === 0
+        ? `${okCount} PDF importé(s) dans [${axe} • ${metier}].`
+        : `${okCount} PDF importé(s), ${errCount} en erreur.`,
+      errCount ? "error" : "success"
+    );
+  }
+
+  // === EDITION / SUPPRESSION ===
+  function openEditModal(id) {
+    const doc = allDocs.find(d => d.id === id);
+    if (!doc) return;
+    refreshAllSelects();
+    document.getElementById("editDocId").value = doc.id;
+    document.getElementById("editTitle").value = doc.title || "";
+    document.getElementById("editDate").value = doc.doc_date || "";
+    document.getElementById("editAxe").value = doc.axe || "";
+    document.getElementById("editMetier").value = doc.metier || "";
+    document.getElementById("editModal").classList.remove("hidden");
+  }
+
+  function closeEditModal() {
+    document.getElementById("editModal").classList.add("hidden");
+  }
+
+  async function saveEditModal(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById("editDocId").value, 10);
+    const { error } = await sb.from("documents").update({
+      title: document.getElementById("editTitle").value.trim(),
+      doc_date: document.getElementById("editDate").value,
+      axe: document.getElementById("editAxe").value,
+      metier: document.getElementById("editMetier").value
+    }).eq("id", id);
+
+    if (error) return showAlert("Erreur mise à jour : " + error.message, "error");
+    closeEditModal();
+    await loadAllData();
+    renderAdminList();
+    showAlert("Document mis à jour.");
+  }
+
+  async function handleDelete(id, title) {
+    if (!confirm(`Supprimer définitivement « ${title} » ?`)) return;
+    const doc = allDocs.find(d => d.id === id);
+    if (!doc) return;
+
+    await sb.storage.from(BUCKET).remove([doc.storage_path]);
+    const { error } = await sb.from("documents").delete().eq("id", id);
+    if (error) return showAlert("Erreur suppression : " + error.message, "error");
+
+    await loadAllData();
+    renderAdminList();
+    showAlert(`« ${title} » supprimé.`);
+  }
+
+  // === OUVRIR / TELECHARGER PDF ===
+  function getPdfUrl(doc, download = false) {
+    const { data } = sb.storage.from(BUCKET).getPublicUrl(doc.storage_path);
+    if (!download) return data.publicUrl;
+    const filename = doc.original_name || `${doc.title}.pdf`;
+    return `${data.publicUrl}?download=${encodeURIComponent(filename)}`;
+  }
+
+  function openPdf(id, pageNum = 1, download = false) {
+    const doc = allDocs.find(d => d.id === id);
+    if (!doc) return;
+    const url = getPdfUrl(doc, download);
+    if (download) {
+      window.location.href = url;
+    } else {
+      window.open(`${url}#page=${pageNum}`, "_blank");
+    }
+  }
+
+  // === RECHERCHE & FILTRAGE ===
+  function buildSnippet(text, terms) {
+    const normText = normalizeText(text);
+    let firstIdx = -1;
+    for (const t of terms) {
+      const idx = normText.indexOf(t);
+      if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) firstIdx = idx;
+    }
+    if (firstIdx === -1) return "";
+
+    const start = Math.max(0, firstIdx - 90);
+    const end = Math.min(text.length, firstIdx + 170);
+    let excerpt = (start > 0 ? "… " : "") + text.slice(start, end) + (end < text.length ? " …" : "");
+
+    let html = escapeHtml(excerpt);
+    for (const term of [...terms].sort((a, b) => b.length - a.length)) {
+      if (!term) continue;
+      const pattern = term.split("").map(ch => {
+        const map = { a:"[aàâä]", e:"[eéèêë]", i:"[iîï]", o:"[oôö]", u:"[uùûü]", c:"[cç]" };
+        return map[ch] || ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }).join("");
+      html = html.replace(new RegExp(`(${pattern})`, "gi"), "<mark>$1</mark>");
+    }
+    return html;
+  }
+
+  function runSearch(e) {
+    if (e) e.preventDefault();
+    const query = document.getElementById("searchInput").value.trim();
+    const exact = document.getElementById("exactCheck").checked;
+    const selectedAxe = document.getElementById("filterAxe").value;
+    const selectedMetier = document.getElementById("filterMetier").value;
+    const dateFrom = document.getElementById("filterDateFrom").value;
+    const dateTo = document.getElementById("filterDateTo").value;
+
+    document.getElementById("resetSearchLink").classList.toggle(
+      "hidden",
+      !(query || selectedAxe || selectedMetier || dateFrom || dateTo)
+    );
+
+    let docs = allDocs;
+    if (selectedAxe) docs = docs.filter(d => d.axe === selectedAxe);
+    if (selectedMetier) docs = docs.filter(d => d.metier === selectedMetier);
+    if (dateFrom) docs = docs.filter(d => (d.doc_date || "") >= dateFrom);
+    if (dateTo) docs = docs.filter(d => (d.doc_date || "") <= dateTo);
+
+    const container = document.getElementById("publicList");
+
+    if (!query) {
+      document.getElementById("publicTitle").textContent = `RCC disponibles (${docs.length})`;
+      if (!docs.length) {
+        container.innerHTML = `<div class="card empty">Aucun RCC ne correspond aux filtres sélectionnés.</div>`;
+        return;
+      }
+      container.innerHTML = docs.map(doc => `
+        <div class="card doc-item">
+          <div>
+            <div class="doc-meta">${renderBadges(doc)}</div>
+            <div class="doc-title">${escapeHtml(doc.title)}</div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn btn-primary btn-sm" onclick="openPdf(${doc.id}, 1, false)">Ouvrir</button>
+            <button class="btn btn-secondary btn-sm" onclick="openPdf(${doc.id}, 1, true)">Télécharger</button>
+          </div>
+        </div>
+      `).join("");
+      return;
+    }
+
+    const normQuery = normalizeText(query);
+    const terms = exact ? [normQuery] : normQuery.split(/\s+/).filter(Boolean);
+
+    const results = [];
+    for (const doc of docs) {
+      const matches = [];
+      for (const p of (doc.pages || [])) {
+        const normPage = normalizeText(p.text);
+        if (terms.every(t => normPage.includes(t))) {
+          matches.push({ pageNum: p.pageNum, snippet: buildSnippet(p.text, terms) });
+        }
+      }
+      if (matches.length) results.push({ doc, matches });
+    }
+
+    document.getElementById("publicTitle").textContent = `${results.length} document(s) trouvé(s) pour « ${query} »`;
+    if (!results.length) {
+      container.innerHTML = `<div class="card empty">Aucun résultat trouvé dans les PDF pour cette recherche.</div>`;
+      return;
+    }
+
+    container.innerHTML = results.map(({ doc, matches }) => `
+      <div class="card">
+        <div class="doc-item" style="padding-bottom:12px;border-bottom:1px solid var(--border);">
+          <div>
+            <div class="doc-meta">${renderBadges(doc)}</div>
+            <div class="doc-title">${escapeHtml(doc.title)}</div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn btn-primary btn-sm" onclick="openPdf(${doc.id}, ${matches[0].pageNum}, false)">Ouvrir</button>
+            <button class="btn btn-secondary btn-sm" onclick="openPdf(${doc.id}, 1, true)">Télécharger</button>
+          </div>
+        </div>
+        <div class="snippet-list">
+          ${matches.map(m => `
+            <div class="snippet-box">
+              <a class="snippet-page" onclick="openPdf(${doc.id}, ${m.pageNum}, false)">Page ${m.pageNum} →</a>
+              <div>${m.snippet}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function resetSearch(e) {
+    if (e) e.preventDefault();
+    document.getElementById("searchInput").value = "";
+    document.getElementById("exactCheck").checked = false;
+    document.getElementById("filterAxe").value = "";
+    document.getElementById("filterMetier").value = "";
+    document.getElementById("filterDateFrom").value = "";
+    document.getElementById("filterDateTo").value = "";
+    runSearch();
+  }
+
+  function renderAdminList() {
+    document.getElementById("adminCount").textContent = `Documents enregistrés (${allDocs.length})`;
+    const container = document.getElementById("adminList");
+    if (!allDocs.length) {
+      container.innerHTML = `<div class="card empty">Aucun document importé.</div>`;
+      return;
+    }
+    container.innerHTML = allDocs.map(doc => `
+      <div class="card doc-item">
+        <div>
+          <div class="doc-meta">${renderBadges(doc)}</div>
+          <div class="doc-title">${escapeHtml(doc.title)}</div>
+        </div>
+        <div class="doc-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openEditModal(${doc.id})">Modifier</button>
+          <button class="btn btn-danger btn-sm" onclick="handleDelete(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">Supprimer</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // === INITIALISATION ===
+  (async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    isAdmin = Boolean(session);
+    document.getElementById("btnLogout").classList.toggle("hidden", !isAdmin);
+    await loadAllData();
+    runSearch();
+  })();
+</script>
+</body>
+</html>
