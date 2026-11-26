@@ -8,6 +8,7 @@
   <link rel="icon" type="image/svg+xml" href="https://moralscore.org/media/icons/large/CGT_-_ethique_-_moralscore_-_comparateur.svg">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="config.js"></script>
   <style>
     :root {
@@ -139,7 +140,7 @@
       border-radius: 8px;
       padding: 12px;
     }
-    .progress-label { display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; gap: 10px; }
     .progress-bar-bg { height: 10px; background: #e4e4e7; border-radius: 99px; overflow: hidden; }
     .progress-bar-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.2s; }
 
@@ -224,6 +225,18 @@
 
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
     .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; color: var(--text); }
+
+    .ocr-option {
+      margin: 10px 0 14px;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+    .ocr-option label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
 
     .tax-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
     .tax-box { background: #fafafa; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
@@ -389,6 +402,13 @@
           </div>
         </div>
 
+        <div class="ocr-option">
+          <label>
+            <input type="checkbox" id="enableOcr" checked>
+            Activer l'OCR automatique sur les pages scannées (plus lent mais rend les scans recherchables)
+          </label>
+        </div>
+
         <button type="submit" id="btnUpload" class="btn btn-primary">Importer et indexer</button>
 
         <div id="progressWrap" class="progress-wrap hidden">
@@ -483,6 +503,7 @@
   let allDocs = [];
   let taxonomy = { axes: [], metiers: [] };
   let selectedFiles = [];
+  let ocrWorker = null;
 
   // === CHARGEMENT DONNEES SUPABASE ===
   async function loadAllData() {
@@ -726,7 +747,15 @@
 
   function openAdmin() {
     showView(isAdmin ? "admin" : "login");
-    if (!isAdmin) setTimeout(() => document.getElementById("adminEmail").focus(), 50);
+    if (!isAdmin) {
+      const emailInput = document.getElementById("adminEmail");
+      if (window.APP_CONFIG.ADMIN_EMAIL && !emailInput.value) {
+        emailInput.value = window.APP_CONFIG.ADMIN_EMAIL;
+        setTimeout(() => document.getElementById("adminPwd").focus(), 50);
+      } else {
+        setTimeout(() => emailInput.focus(), 50);
+      }
+    }
   }
 
   async function handleLogin(e) {
@@ -750,16 +779,46 @@
     showView("public");
   }
 
-  // === UPLOAD PAR LOT VERS SUPABASE ===
+  // === OCR & UPLOAD PAR LOT VERS SUPABASE ===
+  async function getOcrWorker() {
+    if (!ocrWorker) {
+      ocrWorker = await Tesseract.createWorker("fra");
+    }
+    return ocrWorker;
+  }
+
+  async function ocrPdfPage(page) {
+    const viewport = page.getViewport({ scale: 2.0 });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const worker = await getOcrWorker();
+    const { data: { text } } = await worker.recognize(canvas);
+    canvas.width = 0;
+    canvas.height = 0;
+    return (text || "").replace(/\s+/g, " ").trim();
+  }
+
   async function indexAndUploadFile(file, axe, metier, customTitle = null, customDate = null) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
+    const useOcr = document.getElementById("enableOcr")?.checked;
+    const progressText = document.getElementById("progressText");
 
     const pages = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const text = content.items.map(item => item.str).join(" ").replace(/\s+/g, " ").trim();
+      let text = content.items.map(item => item.str).join(" ").replace(/\s+/g, " ").trim();
+
+      if (useOcr && text.length < 25 && window.Tesseract) {
+        progressText.textContent = `OCR page ${i}/${pdf.numPages} : ${file.name}`;
+        text = await ocrPdfPage(page);
+      }
+
       pages.push({ pageNum: i, text });
     }
 
