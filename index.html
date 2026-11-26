@@ -199,6 +199,8 @@
       border-radius: 6px;
     }
     .pages-count { font-size: 0.76rem; color: var(--muted); }
+    .words-ok { font-size: 0.74rem; color: #059669; font-weight: 600; }
+    .words-warn { font-size: 0.74rem; color: #d97706; font-weight: 700; }
     .doc-title { font-weight: 600; font-size: 0.98rem; }
     .doc-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
@@ -226,17 +228,8 @@
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
     .field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 5px; color: var(--text); }
 
-    .ocr-option {
-      margin: 10px 0 14px;
-      font-size: 0.84rem;
-      color: var(--muted);
-    }
-    .ocr-option label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-    }
+    .ocr-option { margin: 10px 0 14px; font-size: 0.84rem; color: var(--muted); }
+    .ocr-option label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 
     .tax-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
     .tax-box { background: #fafafa; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
@@ -405,7 +398,7 @@
         <div class="ocr-option">
           <label>
             <input type="checkbox" id="enableOcr" checked>
-            Activer l'OCR automatique sur les pages scannées (plus lent mais rend les scans recherchables)
+            Activer l'OCR automatique sur les pages scannées (redressement auto inclus)
           </label>
         </div>
 
@@ -644,12 +637,26 @@
     return `${d}/${m}/${y}`;
   }
 
-  function renderBadges(doc) {
+  function countIndexedWords(doc) {
+    const allText = (doc.pages || []).map(p => p.text || "").join(" ").trim();
+    if (!allText) return 0;
+    return allText.split(/\s+/).filter(Boolean).length;
+  }
+
+  function renderBadges(doc, showWordCount = false) {
+    let wordHtml = "";
+    if (showWordCount) {
+      const words = countIndexedWords(doc);
+      wordHtml = words > 10
+        ? `<span class="words-ok">• ${words} mots indexés</span>`
+        : `<span class="words-warn">• ${words} mot (non lisible)</span>`;
+    }
     return `
       <span class="badge">${formatDateFR(doc.doc_date)}</span>
       ${doc.axe ? `<span class="badge-axe">${escapeHtml(doc.axe)}</span>` : ""}
       ${doc.metier ? `<span class="badge-metier">${escapeHtml(doc.metier)}</span>` : ""}
       <span class="pages-count">${doc.page_count} p.</span>
+      ${wordHtml}
     `;
   }
 
@@ -779,9 +786,11 @@
     showView("public");
   }
 
-  // === OCR & UPLOAD PAR LOT VERS SUPABASE ===
+  // === OCR (AVEC REDRESSEMENT AUTO) & UPLOAD PAR LOT ===
   async function getOcrWorker() {
     if (!ocrWorker) {
+      const progressText = document.getElementById("progressText");
+      if (progressText) progressText.textContent = "Chargement du moteur OCR (français)...";
       ocrWorker = await Tesseract.createWorker("fra");
     }
     return ocrWorker;
@@ -793,10 +802,14 @@
     const ctx = canvas.getContext("2d");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     await page.render({ canvasContext: ctx, viewport }).promise;
 
     const worker = await getOcrWorker();
-    const { data: { text } } = await worker.recognize(canvas);
+    const { data: { text } } = await worker.recognize(canvas, { rotateAuto: true });
     canvas.width = 0;
     canvas.height = 0;
     return (text || "").replace(/\s+/g, " ").trim();
@@ -872,7 +885,7 @@
 
     for (let i = 0; i < total; i++) {
       const file = selectedFiles[i];
-      progressText.textContent = `Envoi : ${file.name}`;
+      progressText.textContent = `Traitement : ${file.name}`;
       progressCount.textContent = `${i + 1} / ${total}`;
       progressFill.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
       try {
@@ -1026,7 +1039,7 @@
       container.innerHTML = docs.map(doc => `
         <div class="card doc-item">
           <div>
-            <div class="doc-meta">${renderBadges(doc)}</div>
+            <div class="doc-meta">${renderBadges(doc, false)}</div>
             <div class="doc-title">${escapeHtml(doc.title)}</div>
           </div>
           <div class="doc-actions">
@@ -1063,7 +1076,7 @@
       <div class="card">
         <div class="doc-item" style="padding-bottom:12px;border-bottom:1px solid var(--border);">
           <div>
-            <div class="doc-meta">${renderBadges(doc)}</div>
+            <div class="doc-meta">${renderBadges(doc, false)}</div>
             <div class="doc-title">${escapeHtml(doc.title)}</div>
           </div>
           <div class="doc-actions">
@@ -1104,7 +1117,7 @@
     container.innerHTML = allDocs.map(doc => `
       <div class="card doc-item">
         <div>
-          <div class="doc-meta">${renderBadges(doc)}</div>
+          <div class="doc-meta">${renderBadges(doc, true)}</div>
           <div class="doc-title">${escapeHtml(doc.title)}</div>
         </div>
         <div class="doc-actions">
