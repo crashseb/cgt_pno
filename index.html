@@ -202,7 +202,7 @@
     .words-ok { font-size: 0.74rem; color: #059669; font-weight: 600; }
     .words-warn { font-size: 0.74rem; color: #d97706; font-weight: 700; }
     .doc-title { font-weight: 600; font-size: 0.98rem; }
-    .doc-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .doc-actions { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
 
     .snippet-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
     .snippet-box {
@@ -261,9 +261,34 @@
       z-index: 50;
       padding: 16px;
     }
-    .modal { background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 460px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .modal-wide { max-width: 720px; }
     .modal h3 { font-size: 1.05rem; margin-bottom: 14px; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .text-preview-page {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .text-preview-page strong {
+      display: block;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
 
     .alert { padding: 12px 14px; border-radius: 8px; font-size: 0.88rem; font-weight: 500; margin-bottom: 16px; }
     .alert-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
@@ -398,7 +423,7 @@
         <div class="ocr-option">
           <label>
             <input type="checkbox" id="enableOcr" checked>
-            Activer l'OCR automatique sur les pages scannées (redressement auto inclus)
+            Activer l'OCR automatique sur les pages scannées (retournement auto à 180° inclus)
           </label>
         </div>
 
@@ -473,6 +498,17 @@
         <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- MODALE APERCU TEXTE INDEXE -->
+<div id="textModal" class="modal-backdrop hidden" onclick="if(event.target===this) closeTextModal()">
+  <div class="modal modal-wide">
+    <h3 id="textModalTitle">Texte indexé</h3>
+    <div id="textModalBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="closeTextModal()">Fermer</button>
+    </div>
   </div>
 </div>
 
@@ -786,7 +822,7 @@
     showView("public");
   }
 
-  // === OCR (AVEC REDRESSEMENT AUTO) & UPLOAD PAR LOT ===
+  // === OCR AVEC RETOURNEMENT AUTO 180° PAR SCORE DE CONFIANCE ===
   async function getOcrWorker() {
     if (!ocrWorker) {
       const progressText = document.getElementById("progressText");
@@ -796,30 +832,51 @@
     return ocrWorker;
   }
 
-  async function ocrPdfPage(page) {
-    const viewport = page.getViewport({ scale: 2.0 });
+  async function renderPageToCanvas(page, extraRotation = 0) {
+    const rotation = ((page.rotate || 0) + extraRotation) % 360;
+    const viewport = page.getViewport({ scale: 2.0, rotation });
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas;
+  }
 
+  async function ocrPdfPage(page, pageNum, totalPages, fileName) {
     const worker = await getOcrWorker();
-    const { data: { text } } = await worker.recognize(canvas, { rotateAuto: true });
-    canvas.width = 0;
-    canvas.height = 0;
-    return (text || "").replace(/\s+/g, " ").trim();
+    const progressText = document.getElementById("progressText");
+
+    // 1er essai : orientation d'origine
+    if (progressText) progressText.textContent = `OCR page ${pageNum}/${totalPages} : ${fileName}`;
+    let canvas = await renderPageToCanvas(page, 0);
+    let res = await worker.recognize(canvas);
+    canvas.width = 0; canvas.height = 0;
+
+    let bestText = res.data.text || "";
+    let bestConf = res.data.confidence || 0;
+
+    // Si confiance faible (< 60%), on tente en retournant la page à 180°
+    if (bestConf < 60) {
+      if (progressText) progressText.textContent = `OCR page ${pageNum}/${totalPages} (test 180°) : ${fileName}`;
+      canvas = await renderPageToCanvas(page, 180);
+      const res180 = await worker.recognize(canvas);
+      canvas.width = 0; canvas.height = 0;
+
+      if ((res180.data.confidence || 0) > bestConf) {
+        bestText = res180.data.text || "";
+      }
+    }
+
+    return bestText.replace(/\s+/g, " ").trim();
   }
 
   async function indexAndUploadFile(file, axe, metier, customTitle = null, customDate = null) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
     const useOcr = document.getElementById("enableOcr")?.checked;
-    const progressText = document.getElementById("progressText");
 
     const pages = [];
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -828,8 +885,7 @@
       let text = content.items.map(item => item.str).join(" ").replace(/\s+/g, " ").trim();
 
       if (useOcr && text.length < 25 && window.Tesseract) {
-        progressText.textContent = `OCR page ${i}/${pdf.numPages} : ${file.name}`;
-        text = await ocrPdfPage(page);
+        text = await ocrPdfPage(page, i, pdf.numPages, file.name);
       }
 
       pages.push({ pageNum: i, text });
@@ -913,6 +969,27 @@
         : `${okCount} PDF importé(s), ${errCount} en erreur.`,
       errCount ? "error" : "success"
     );
+  }
+
+  // === APERCU TEXTE INDEXE ===
+  function openTextModal(id) {
+    const doc = allDocs.find(d => d.id === id);
+    if (!doc) return;
+    document.getElementById("textModalTitle").textContent = `Texte indexé — ${doc.title}`;
+    const pages = doc.pages || [];
+    document.getElementById("textModalBody").innerHTML = pages.length
+      ? pages.map(p => `
+          <div class="text-preview-page">
+            <strong>Page ${p.pageNum}</strong>
+            ${escapeHtml(p.text || "(aucun texte extrait)")}
+          </div>
+        `).join("")
+      : `<div class="empty">Aucun texte enregistré pour ce document.</div>`;
+    document.getElementById("textModal").classList.remove("hidden");
+  }
+
+  function closeTextModal() {
+    document.getElementById("textModal").classList.add("hidden");
   }
 
   // === EDITION / SUPPRESSION ===
@@ -1121,6 +1198,7 @@
           <div class="doc-title">${escapeHtml(doc.title)}</div>
         </div>
         <div class="doc-actions">
+          <button class="btn btn-secondary btn-sm" onclick="openTextModal(${doc.id})">Voir texte</button>
           <button class="btn btn-secondary btn-sm" onclick="openEditModal(${doc.id})">Modifier</button>
           <button class="btn btn-danger btn-sm" onclick="handleDelete(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}')">Supprimer</button>
         </div>
